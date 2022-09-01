@@ -44,7 +44,7 @@ def device_block_data(session_identifier, device_identifier, block_identifier):
     # }
     #
     request_data = request.get_json(force=True, silent=True)
-    print(request_data)
+    #print(request_data)
 
     block_key = f'relia:data-uploader:sessions:{session_identifier}:devices:{device_identifier}:blocks:{block_identifier}'
     blocks_key = f'relia:data-uploader:sessions:{session_identifier}:devices:{device_identifier}:blocks'
