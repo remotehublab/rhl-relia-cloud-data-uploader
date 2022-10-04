@@ -47,6 +47,7 @@ def device_block_data(session_identifier, device_identifier, block_identifier):
     #print(request_data)
 
     block_key = f'relia:data-uploader:sessions:{session_identifier}:devices:{device_identifier}:blocks:{block_identifier}'
+    block_alive_key = f'relia:data-uploader:sessions:{session_identifier}:devices:{device_identifier}:blocks:{block_identifier}:alive'
     blocks_key = f'relia:data-uploader:sessions:{session_identifier}:devices:{device_identifier}:blocks'
     devices_key = f'relia:data-uploader:sessions:{session_identifier}:devices'
     sessions_key = f'relia:data-uploader:sessions'
@@ -56,13 +57,14 @@ def device_block_data(session_identifier, device_identifier, block_identifier):
 
     pipeline.sadd(blocks_key, block_identifier)
     pipeline.sadd(devices_key, device_identifier)
+    pipeline.set(block_alive_key, '1')
 
     # Probably wrong
     pipeline.sadd(sessions_key, session_identifier)
     
     # Expire in 10 minutes (unless someone adds more data here)
-    for key in (block_key, blocks_key, devices_key, sessions_key):
-        pipeline.expire(key, 60 * 10)
+    for key in (block_key, blocks_key, devices_key, sessions_key, block_alive_key):
+        pipeline.expire(key, 60)
     pipeline.execute()
 
     return jsonify(success=True)
