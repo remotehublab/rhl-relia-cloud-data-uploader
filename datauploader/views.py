@@ -1,8 +1,12 @@
 import json
+import time
+import logging
+
 from flask import Blueprint, request, jsonify
 
 from datauploader import redis_store
 
+logger = logging.getLogger(__name__)
 
 main_blueprint = Blueprint('main', __name__)
 
@@ -11,6 +15,68 @@ def index():
     return "Welcome to the data uploader"
 
 api_blueprint = Blueprint('api', __name__)
+
+@api_blueprint.route('/download/sessions/<session_identifier>/devices/<device_identifier>', methods=['GET'])
+def get_device_updates(session_identifier, device_identifier):
+    blocking = request.args.get('blocking') in ('1', 'true', 'True')
+
+    # 1st: check what blocks are in this device
+    blocks_key = f'relia:data-uploader:sessions:{session_identifier}:devices:{device_identifier}:blocks'
+    block_identifiers = redis_store.smembers(blocks_key)
+
+    response = {
+        'success': True,
+        'data': {
+            # block: [items]
+        }
+    }
+
+    initial_time = time.time()
+    maximum_time = 20
+
+    while not response['data']: # while there is no data:
+
+        for block_identifier in block_identifiers:
+            if isinstance(block_identifier, bytes):
+                block_identifier = block_identifier.decode()
+            web2gnuradio_key = f'relia:data-uploader:sessions:{session_identifier}:devices:{device_identifier}:blocks:{block_identifier}:to-gnuradio'
+
+            block_data = []
+
+            while True:
+                item_json = redis_store.lpop(web2gnuradio_key)
+                print(web2gnuradio_key, item_json)
+                if not item_json:
+                    break
+                
+                if isinstance(item_json, bytes):
+                    item_json = item_json.decode()
+
+                try:
+                    item = json.loads(item_json)
+                except Exception as err:
+                    logger.error(f"Error reading item of device {device_identifier} in block {block_identifier}", exc_info=True)
+                    continue
+
+                block_data.append(item)
+
+            if block_data:
+                response['data'][block_identifier] = block_data
+
+        if response['data']:
+            break
+
+        if not blocking:
+            break
+
+        elapsed_time = time.time() - initial_time
+        if elapsed_time > maximum_time:
+            break
+
+        time.sleep(0.1)
+
+    print(response)
+    return jsonify(response)
 
 @api_blueprint.route('/upload/sessions/<session_identifier>/devices/<device_identifier>/blocks/<block_identifier>', methods=['GET', 'POST'])
 def device_block_data(session_identifier, device_identifier, block_identifier):
@@ -46,14 +112,14 @@ def device_block_data(session_identifier, device_identifier, block_identifier):
     request_data = request.get_json(force=True, silent=True)
     #print(request_data)
 
-    block_key = f'relia:data-uploader:sessions:{session_identifier}:devices:{device_identifier}:blocks:{block_identifier}'
+    data_block_key = f'relia:data-uploader:sessions:{session_identifier}:devices:{device_identifier}:blocks:{block_identifier}:from-gnuradio'
     block_alive_key = f'relia:data-uploader:sessions:{session_identifier}:devices:{device_identifier}:blocks:{block_identifier}:alive'
     blocks_key = f'relia:data-uploader:sessions:{session_identifier}:devices:{device_identifier}:blocks'
     devices_key = f'relia:data-uploader:sessions:{session_identifier}:devices'
     sessions_key = f'relia:data-uploader:sessions'
 
     pipeline = redis_store.pipeline()
-    pipeline.rpush(block_key, json.dumps(request_data))
+    pipeline.rpush(data_block_key, json.dumps(request_data))
 
     pipeline.sadd(blocks_key, block_identifier)
     pipeline.sadd(devices_key, device_identifier)
@@ -63,7 +129,7 @@ def device_block_data(session_identifier, device_identifier, block_identifier):
     pipeline.sadd(sessions_key, session_identifier)
     
     # Expire in 10 minutes (unless someone adds more data here)
-    for key in (block_key, blocks_key, devices_key, sessions_key, block_alive_key):
+    for key in (data_block_key, blocks_key, devices_key, sessions_key, block_alive_key):
         pipeline.expire(key, 60)
     pipeline.execute()
 
