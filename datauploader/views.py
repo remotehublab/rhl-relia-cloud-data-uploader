@@ -16,8 +16,26 @@ def index():
 
 api_blueprint = Blueprint('api', __name__)
 
-@api_blueprint.route('/download/sessions/<session_identifier>/devices/<device_identifier>', methods=['GET'])
+@api_blueprint.route('/download/sessions/<session_identifier>/devices/<device_identifier>', methods=['GET', 'DELETE'])
 def get_device_updates(session_identifier, device_identifier):
+
+    if request.method == 'DELETE':
+        blocks_key = f'relia:data-uploader:sessions:{session_identifier}:devices:{device_identifier}:blocks'
+        block_identifiers = redis_store.smembers(blocks_key)
+
+        pipeline = redis_store.pipeline()
+        for block_identifier in block_identifiers:
+            data_block_key = f'relia:data-uploader:sessions:{session_identifier}:devices:{device_identifier}:blocks:{block_identifier}:from-gnuradio'
+            block_alive_key = f'relia:data-uploader:sessions:{session_identifier}:devices:{device_identifier}:blocks:{block_identifier}:alive'
+            pipeline.delete(data_block_key)
+            pipeline.delete(block_alive_key)
+            pipeline.srem(blocks_key, block_identifier)
+
+        devices_key = f'relia:data-uploader:sessions:{session_identifier}:devices'
+        pipeline.srem(devices_key, device_identifier)
+        pipeline.execute()
+        return jsonify(success=True)
+
     blocking = request.args.get('blocking') in ('1', 'true', 'True')
 
     # 1st: check what blocks are in this device
