@@ -40,7 +40,6 @@ def get_device_updates(session_identifier, device_identifier):
 
     # 1st: check what blocks are in this device
     blocks_key = f'relia:data-uploader:sessions:{session_identifier}:devices:{device_identifier}:blocks'
-    block_identifiers = redis_store.smembers(blocks_key)
 
     response = {
         'success': True,
@@ -53,6 +52,7 @@ def get_device_updates(session_identifier, device_identifier):
     maximum_time = 20
 
     while not response['data']: # while there is no data:
+        block_identifiers = redis_store.smembers(blocks_key)
 
         for block_identifier in block_identifiers:
             if isinstance(block_identifier, bytes):
