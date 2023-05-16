@@ -105,8 +105,6 @@ def device_block_data(session_identifier, device_identifier, block_identifier):
     This method does not know anything about the widgets themselves, but just stores the information 
 
     """
-    if session_identifier == 'my-session-id' && device_identifier == 'my-device-id':
-        return jsonify(success=True)
 
     if request.method == 'GET':
         return jsonify(success=False, message="Not implemented yet")
