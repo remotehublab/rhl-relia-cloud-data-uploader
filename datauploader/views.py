@@ -19,6 +19,9 @@ api_blueprint = Blueprint('api', __name__)
 @api_blueprint.route('/download/sessions/<session_identifier>/devices/<device_identifier>', methods=['GET', 'DELETE'])
 def get_device_updates(session_identifier, device_identifier):
 
+    if session_identifier == 'my-session-id' && device_identifier == 'my-device-id':
+        return jsonify(success=True)
+
     if request.method == 'DELETE':
         blocks_key = f'relia:data-uploader:sessions:{session_identifier}:devices:{device_identifier}:blocks'
         block_identifiers = redis_store.smembers(blocks_key)
@@ -102,6 +105,9 @@ def device_block_data(session_identifier, device_identifier, block_identifier):
     This method does not know anything about the widgets themselves, but just stores the information 
 
     """
+    if session_identifier == 'my-session-id' && device_identifier == 'my-device-id':
+        return jsonify(success=True)
+
     if request.method == 'GET':
         return jsonify(success=False, message="Not implemented yet")
 
