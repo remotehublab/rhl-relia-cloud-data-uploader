@@ -48,7 +48,7 @@ def get_device_updates(session_identifier, device_identifier):
         }
     }
 
-    if session_identifier == 'my-session-id' && device_identifier == 'my-device-id':
+    if session_identifier == 'my-session-id' and device_identifier == 'my-device-id':
         return jsonify(response)
 
     initial_time = time.time()
